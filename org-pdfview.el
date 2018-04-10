@@ -35,6 +35,9 @@
 (require 'pdf-tools)
 (require 'pdf-view)
 
+(defvar org-pdfview-dwim
+  t)
+
 (if (fboundp 'org-link-set-parameters)
     (org-link-set-parameters "pdfview"
                              :follow #'org-pdfview-open
@@ -87,13 +90,29 @@
        ((eq format 'ascii) (format "%s (%s)" desc path))
        (t path)))))
 
+(defun org-pdfview-dwim-target-file-page ()
+  (if org-pdfview-dwim
+	(let* ((other-win (get-window-with-predicate
+			   (lambda (window)
+			     (with-current-buffer (window-buffer window)
+			       (eq major-mode 'pdf-view-mode)))))
+	       (other-pdf (and other-win
+			       (with-current-buffer (window-buffer other-win)
+				 (and (eq major-mode 'pdf-view-mode)
+				      `(,(buffer-file-name) ,(pdf-view-current-page)))))))
+	  other-pdf)))
+
 (defun org-pdfview-complete-link (&optional arg)
   "Use the existing file name completion for file.
 Links to get the file name, then ask the user for the page number
 and append it."
-  (concat (replace-regexp-in-string "^file:" "pdfview:" (org-file-complete-link arg))
-	  "::"
-	  (read-from-minibuffer "Page:" "1")))
+  (let* ((ret (org-pdfview-dwim-target-file-page))
+	 (file-name (car ret))
+	 (curr-page (cdar ret)))
+    (concat (replace-regexp-in-string "^file:" "pdfview:" (or file-name
+							      (org-file-complete-link arg)))
+	    "::"
+	    (read-from-minibuffer "Page:" (or curr-page "1")))))
 
 
 (provide 'org-pdfview)
